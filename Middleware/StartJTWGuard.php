@@ -5,7 +5,7 @@ namespace App\JWTokenGuard\Middleware;
 use Closure;
 use Illuminate\Contracts\Container\Container;
 
-class StartTokenGuard
+class StartJTWGuard
 {
     protected $container;
 

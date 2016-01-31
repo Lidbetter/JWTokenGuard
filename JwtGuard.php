@@ -13,7 +13,7 @@ use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 
-class JwtGuard implements Guard
+class JWTGuard implements Guard
 {
     use GuardHelpers;
 

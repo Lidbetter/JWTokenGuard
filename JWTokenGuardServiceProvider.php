@@ -19,7 +19,7 @@ class JWTokenGuardServiceProvider extends ServiceProvider
         /** \Illuminate\Auth\AuthManager */
         $this->app['auth']->extend('jwt', function ($app, $name, array $config) {
             // Return an instance of Illuminate\Contracts\Auth\Guard...
-            return new JwtGuard(
+            return new JWTGuard(
                 $app['request'],
                 $app['auth']->createUserProvider($config['provider']),
                 new Builder(),
