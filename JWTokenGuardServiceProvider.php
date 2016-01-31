@@ -16,6 +16,16 @@ class JWTokenGuardServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // publish the config file with:
+        // php artisan vendor:publish --provider="Lidbetter\JWTokenGuard\JWTokenGuardServiceProvider"
+        $this->publishes([__DIR__.'/config.php' => config_path('jwtguard.php')]);
+
+        // load the default config if the user has not published it
+        if(!$this->app['config']['jwtguard']) {
+
+            $this->app['config']->set('jwtguard', require __DIR__.'/config.php');
+        }
+
         /** \Illuminate\Auth\AuthManager */
         $this->app['auth']->extend('jwt', function ($app, $name, array $config) {
             // Return an instance of Illuminate\Contracts\Auth\Guard...
@@ -24,7 +34,7 @@ class JWTokenGuardServiceProvider extends ServiceProvider
                 $app['auth']->createUserProvider($config['provider']),
                 new Builder(),
                 new Parser(),
-                $app->config['app']['key']
+                $this->app['config']['jwtguard']
             );
         });
     }
@@ -37,5 +47,15 @@ class JWTokenGuardServiceProvider extends ServiceProvider
     public function register()
     {
         //
+    }
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array
+     */
+    public function provides()
+    {
+        return array("jwtguard");
     }
 }

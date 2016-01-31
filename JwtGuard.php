@@ -9,13 +9,17 @@ use Illuminate\Auth\Events;
 use Illuminate\Http\Request;
 use Illuminate\Auth\GuardHelpers;
 use Illuminate\Contracts\Auth\Guard;
-use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 
 class JWTGuard implements Guard
 {
     use GuardHelpers;
+
+    /**
+     * @var array
+     */
+    protected $config;
 
     /**
      * The request instance.
@@ -40,35 +44,36 @@ class JWTGuard implements Guard
     protected $secret;
 
     /**
+     * @var string class name, subclass of (\Lcobucci\JWT\Signer\BaseSigner)
+     */
+    protected $signer;
+
+    /**
      * @var string|null
      */
     protected $tokenStr;
 
-    /**
-     * @var \Lcobucci\JWT\Token|null
-     */
-    protected $token;
 
     /**
      * JwtGuard constructor.
      *
-     * @param \Illuminate\Http\Request                $request
+     * @param \Illuminate\Http\Request $request
      * @param \Illuminate\Contracts\Auth\UserProvider $provider
-     * @param \Lcobucci\JWT\Builder                   $builder
-     * @param \Lcobucci\JWT\Parser                    $parser
-     * @param string                                  $secret
+     * @param \Lcobucci\JWT\Builder $builder
+     * @param \Lcobucci\JWT\Parser $parser
+     * @param array $guardConfig
      */
-    public function __construct(Request $request, UserProvider $provider, Builder $builder, Parser $parser, $secret)
+    public function __construct(Request $request, UserProvider $provider, Builder $builder, Parser $parser, $guardConfig)
     {
+        $this->config = $guardConfig;
         $this->request = $request;
         $this->provider = $provider;
         $this->builder = $builder;
         $this->parser = $parser;
-        $this->secret = $secret;
+        $this->secret = empty($this->config['key']) ? config('app.key') : $this->config['key'];
+        $this->signer = '\\'.ltrim($this->config['signer'], '\\');
 
         $this->tokenStr = $this->getTokenForRequest();
-        $this->token = $this->validTokenFromStr($this->tokenStr);
-
     }
 
     /**
@@ -87,11 +92,16 @@ class JWTGuard implements Guard
 
         $user = null;
 
-        if (! empty($this->token)) {
-            // after verifying that the token has not been tampered with
-            // get the identifiable info from it and pass it in to get the user
-            $creds = $this->getTokenCredentials();
+
+        // after verifying that the token has not been tampered with
+        // get the identifiable info from it and pass it in to get the user
+        $token = $this->validTokenFromStr($this->tokenStr);
+        if($token) {
+            $creds = $this->getTokenCredentials($token);
             $user = $this->provider->retrieveByCredentials($creds);
+            if (!$this->hasValidTokenHashForUser($token, $user)) {
+                $user = null;
+            }
         }
 
         return $this->user = $user;
@@ -108,48 +118,6 @@ class JWTGuard implements Guard
         // TODO: Implement validate() method.
         return false;
     }
-
-    protected function getTokenCredentials()
-    {
-        return array_filter([
-            'id' => $this->token->getClaim('id', ''),
-            'email' => $this->token->getClaim('email', ''),
-            'username' => $this->token->getClaim('username', ''),
-        ]);
-    }
-
-    /**
-     * Get the token for the current request.
-     *
-     * @return string
-     */
-    protected function getTokenForRequest()
-    {
-        $token = $this->request->input('api_token');
-
-        if (empty($token)) {
-            $token = $this->request->bearerToken();
-        }
-
-        if (empty($token)) {
-            $token = $this->request->getPassword();
-        }
-
-        return $token;
-    }
-
-    protected function validTokenFromStr($tokenStr)
-    {
-        if(! empty($tokenStr)) {
-            $token = $this->parser->parse($tokenStr);
-            if($token->verify(new Sha256(), $this->secret)) {
-                return $token;
-            }
-        }
-        return null;
-    }
-
-    // making tokens
 
     /**
      * Attempt to authenticate a user using the given credentials.
@@ -201,7 +169,6 @@ class JWTGuard implements Guard
      */
     public function login(AuthenticatableContract $user, $remember = false)
     {
-
         // If we have an event dispatcher instance set we will fire an event so that
         // any listeners will hook into the authentication events and run actions
         // based on the login and logout events fired from the guard instances.
@@ -209,39 +176,108 @@ class JWTGuard implements Guard
 
         $this->setUser($user);
 
-        $this->createTokenForceNew($user);
+        $this->createToken($user);
     }
 
-    protected function token(AuthenticatableContract $user, $force = false)
+    /**
+     * Get the token for the current request.
+     *
+     * @return string
+     */
+    protected function getTokenForRequest()
     {
-        if(!$force && $this->token) {
-            return $this->token;
+        $token = $this->request->input('api_token');
+
+        if (empty($token)) {
+            $token = $this->request->bearerToken();
         }
 
-        if($force) {
-            $this->builder->unsign();
+        if (empty($token)) {
+            $token = $this->request->getPassword();
         }
 
-        $authIdentifierName = $user->getAuthIdentifierName();
-        $authIdentifierValue = $user->{$authIdentifierName};
+        return $token;
+    }
 
-        return $this->token = $this->builder
-            ->setIssuedAt(time()) // Configures the time that the token was issue (iat claim)
-            ->setNotBefore(time() + 60) // Configures the time that the token can be used (nbf claim)
-            ->setExpiration(time() + 3600) // Configures the expiration time of the token (exp claim)
-            ->set($authIdentifierName, $authIdentifierValue) // Configures a new claim, called "id"
-            ->sign(new Sha256(), $this->secret) // creates a signature using app key as secret
-            ->getToken(); // Retrieves the generated token
+    protected function validTokenFromStr($tokenStr)
+    {
+        if(! empty($tokenStr)) {
+            $token = $this->parser->parse($tokenStr);
+            if($token->verify(new $this->signer, $this->secret)) {
+                return $token;
+            }
+        }
+
+        return null;
+    }
+
+    protected function hasValidTokenHashForUser(Token $token, AuthenticatableContract $user = null)
+    {
+        if(!$user) {
+            return false;
+        }
+
+        return ($token->getClaim('hash') === $this->buildTokenPayloadHash($user));
     }
 
     public function createToken(AuthenticatableContract $user)
     {
-        return $this->token($user, $force = false);
+        $payload = $this->buildTokenPayload($user);
+        
+        $this->builder->unsign();
+
+        // set additional payload data
+        foreach($payload as $key => $value) {
+            $this->builder->set($key, $value);
+        }
+
+        $now = time();
+        $lifespanSecs = $this->config['lifespan'] * 60;
+
+        return $this->builder
+            ->setIssuedAt($now) // Configures the time that the token was issue (iat claim)
+            ->setExpiration($now + $lifespanSecs) // Configures the expiration time of the token (exp claim)
+            ->sign(new $this->signer, $this->secret) // creates a signature using app key as secret
+            ->getToken(); // Retrieves the generated token
     }
 
-    public function createTokenForceNew(AuthenticatableContract $user)
+    protected function buildTokenPayload(AuthenticatableContract $user)
     {
-        return $this->token($user, $force = true);
+        $payload = [];
+        $payload['hash'] = $this->buildTokenPayloadHash($user);
+
+        foreach($this->config['payload'] as $property) {
+            $payload[$property] = $user->{$property};
+        }
+
+        return $payload;
+    }
+
+    protected function buildTokenPayloadHash(AuthenticatableContract $user)
+    {
+        $hashableString = '';
+        foreach($this->config['hash'] as $property) {
+            $hashableString .= $user->{$property};
+        }
+        return sha1($hashableString);
+    }
+
+
+    protected function getTokenCredentialsWithHash(Token $token) {
+        $payload = $this->getTokenCredentials($token);
+        $payload['hash'] = $token->getClaim('hash');
+
+        return $payload;
+    }
+
+    protected function getTokenCredentials(Token $token)
+    {
+        $creds = [];
+        foreach($this->config['payload'] as $property) {
+            $creds[$property] = $token->getClaim($property);
+        }
+
+        return $creds;
     }
 
     /**
