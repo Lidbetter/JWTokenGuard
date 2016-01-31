@@ -1,6 +1,6 @@
 <?php
 
-namespace App\JWTokenGuard\Middleware;
+namespace Lidbetter\JWTokenGuard\Middleware;
 
 use Closure;
 use Illuminate\Contracts\Container\Container;

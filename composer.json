@@ -1,0 +1,20 @@
+
+{
+  "name": "lidbetter/jw-token-guard",
+  "description": "A Json Web Token Guard adaptor for the Laravel Framework",
+  "keywords": ["guard", "jwt", "json web token", "laravel"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Robin Lidbetter"
+    }
+  ],
+  "require": {
+    "lcobucci/jwt": "^3.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Lidbetter\\JWTokenGuard\\": "/"
+    }
+  }
+}

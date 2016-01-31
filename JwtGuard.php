@@ -1,6 +1,6 @@
 <?php
 
-namespace App\JWTokenGuard;
+namespace Lidbetter\JWTokenGuard;
 
 use Lcobucci\JWT\Token;
 use Lcobucci\JWT\Parser;
@@ -223,7 +223,7 @@ class JWTGuard implements Guard
     public function createToken(AuthenticatableContract $user)
     {
         $payload = $this->buildTokenPayload($user);
-        
+
         $this->builder->unsign();
 
         // set additional payload data

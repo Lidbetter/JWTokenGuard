@@ -46,7 +46,7 @@ return [
     | This option controls the which items are included in the token payload.
     | This cannot be empty. You should include the model ID, or some other
     | information which does not change and is unique to a single user
-    | (maybe email? or username?). This information can be retrieved
+    | (maybe email or username). This information can be retrieved
     | by the Guard and used without consulting the database.
     |
     */

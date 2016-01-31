@@ -1,10 +1,10 @@
 <?php
 
-namespace App\JWTokenGuard;
+namespace Lidbetter\JWTokenGuard;
 
-use App\JWTokenGuard;
 use Lcobucci\JWT\Parser;
 use Lcobucci\JWT\Builder;
+use Lidbetter\JWTokenGuard;
 use Illuminate\Support\ServiceProvider;
 
 class JWTokenGuardServiceProvider extends ServiceProvider
@@ -37,25 +37,5 @@ class JWTokenGuardServiceProvider extends ServiceProvider
                 $this->app['config']['jwtguard']
             );
         });
-    }
-
-    /**
-     * Register bindings in the container.
-     *
-     * @return void
-     */
-    public function register()
-    {
-        //
-    }
-
-    /**
-     * Get the services provided by the provider.
-     *
-     * @return array
-     */
-    public function provides()
-    {
-        return array("jwtguard");
     }
 }

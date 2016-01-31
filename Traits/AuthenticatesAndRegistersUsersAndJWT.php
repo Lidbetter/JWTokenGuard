@@ -1,6 +1,6 @@
 <?php
 
-namespace App\JWTokenGuard\Traits;
+namespace Lidbetter\JWTokenGuard\Traits;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
